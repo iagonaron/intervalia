@@ -41,6 +41,24 @@
   }
   body.pro::after{ opacity:1; }
   .home2,.ath{font-style:italic;font-family:Georgia,'Times New Roman',serif;font-weight:500;color:#aeb6d6;transform:rotate(-3deg);display:inline-block}
+  @keyframes noteShake{
+    0%,100%{transform:translateX(0)}
+    15%{transform:translateX(-2.5px)} 30%{transform:translateX(2.5px)}
+    45%{transform:translateX(-2px)} 60%{transform:translateX(2px)}
+    75%{transform:translateX(-1px)} 90%{transform:translateX(1px)}
+  }
+  /* overlay de resultado a pantalla completa (estilo cuenta atrás) */
+  #resultOverlay{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+    background:rgba(6,10,24,.62);pointer-events:none}
+  #resultOverlay.on{display:flex;animation:resultPop .35s ease-out}
+  @keyframes resultPop{0%{opacity:0;transform:scale(.92)}100%{opacity:1;transform:scale(1)}}
+  .result-inner{text-align:center;line-height:1}
+  .result-score{font-size:min(34vw,300px);font-weight:900;letter-spacing:-.04em;
+    font-variant-numeric:tabular-nums;text-shadow:0 6px 50px rgba(0,0,0,.45)}
+  .result-msg{font-size:min(6vw,38px);font-weight:800;margin-top:10px;letter-spacing:.02em}
+  #resultOverlay.good .result-score,#resultOverlay.good .result-msg{color:#22c98a}
+  #resultOverlay.mid  .result-score,#resultOverlay.mid  .result-msg{color:#f5a623}
+  #resultOverlay.bad  .result-score,#resultOverlay.bad  .result-msg{color:#ff5c72}
 
   /* topinfo */
   .topinfo{display:flex;justify-content:flex-end;align-items:baseline;gap:7px;margin:0 0 6px;line-height:1}
@@ -95,6 +113,11 @@
   .scoreBox{background:var(--paper);border-radius:10px;padding:2px 8px 10px;overflow:hidden;position:relative;width:100%}
   .scoreBox svg{display:block;width:100%;height:auto}
   .ex-status{font-size:12px;color:var(--muted);min-height:1em}
+  .vumsg{display:none;font-size:11px;font-weight:600;white-space:nowrap}
+  .vumsg.show{display:inline}
+  .vumsg.ok{color:var(--muted2)}
+  .vumsg.low{color:var(--amber)}
+  .vumsg.none{color:var(--red)}
   .ex-play{border:1px solid rgba(233,237,255,.45);background:rgba(233,237,255,.16);color:#e9edff;border-radius:50%;
     width:38px;height:38px;flex:0 0 38px;cursor:pointer;display:grid;place-items:center;padding:0;
     transition:background .15s,transform .05s;box-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -152,10 +175,15 @@
 
   .result{text-align:center;font-size:15px;font-weight:700;margin-top:14px;min-height:1.4em}
   .debug{text-align:center;font-size:11px;color:var(--muted2);font-family:monospace;margin-top:6px;min-height:1.2em}
-  .signal-warn{text-align:center;font-size:12px;color:var(--amber);margin-top:4px;min-height:1.2em}
+  .signal-warn{text-align:center;font-size:12px;color:var(--muted);margin-top:6px;min-height:1.2em;font-weight:600;transition:color .15s}
+  .signal-warn.ok{color:var(--muted2);font-weight:500}
+  .signal-warn.low{color:var(--amber);font-size:13px}
+  .signal-warn.none{color:var(--red);font-size:13px}
+  .signal-warn .tip{display:block;font-size:11px;color:var(--muted2);font-weight:400;margin-top:2px}
 </style>
 </head>
 <body>
+<div id="resultOverlay"><div class="result-inner"><div class="result-score" id="resultScore"></div><div class="result-msg" id="resultMsg"></div></div></div>
 <div class="topinfo">
   <span class="topinfo-by">by Iago González Alonso</span>
   <span class="topinfo-sep">·</span>
@@ -185,8 +213,8 @@
 <div class="pro-note" id="proNote"></div>
 
 <div class="grid" id="grid">
-  <div class="ex" id="ex0"><div class="ex-head"><button class="ex-play" data-ex="0" title="Cantar este ejercicio"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="ex-title">Ejercicio 1</span><span class="ex-status" id="status0"></span><span class="ex-key" id="key0"></span></div><div class="scoreBox" id="score0"></div></div>
-  <div class="ex" id="ex1"><div class="ex-head"><button class="ex-play" data-ex="1" title="Cantar este ejercicio"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="ex-title">Ejercicio 2</span><span class="ex-status" id="status1"></span><span class="ex-key" id="key1"></span></div><div class="scoreBox" id="score1"></div></div>
+  <div class="ex" id="ex0"><div class="ex-head"><button class="ex-play" data-ex="0" title="Cantar este ejercicio"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="ex-title">Ejercicio 1</span><span class="ex-status" id="status0"></span><span class="vumsg" id="vumsg0"></span><span class="ex-key" id="key0"></span></div><div class="scoreBox" id="score0"></div></div>
+  <div class="ex" id="ex1"><div class="ex-head"><button class="ex-play" data-ex="1" title="Cantar este ejercicio"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="ex-title">Ejercicio 2</span><span class="ex-status" id="status1"></span><span class="vumsg" id="vumsg1"></span><span class="ex-key" id="key1"></span></div><div class="scoreBox" id="score1"></div></div>
 </div>
 
 <div class="ipanel-label">Intervalos que pueden aparecer</div>
@@ -407,12 +435,30 @@ const INTERVAL_SEMI = {"2m":1,"2M":2,"3m":3,"3M":4,"4J":5,"TT":6,"5J":7,"6m":8,"
 // número diatónico (saltos de letra) por nombre, para ortografía correcta
 const INTERVAL_STEPS = {"2m":1,"2M":1,"3m":2,"3M":2,"4J":3,"TT":3,"5J":4,"6m":5,"6M":5,"7m":6,"7M":6,"8J":7};
 
-// construye la nota a 'iv' semitonos/pasos de 'from', en dirección dir(+1/-1)
+// construye la nota a 'iv' (semitonos + pasos diatónicos) de 'from', dir(+1/-1).
+// La grafía respeta el NOMBRE del intervalo: una 6m se escribe como 6ª (5 letras),
+// nunca como 5ª aumentada aunque suene igual. Devuelve null si requeriría doble alteración.
 function noteByInterval(from, ivName, dir){
   const semis = INTERVAL_SEMI[ivName];
+  const steps = INTERVAL_STEPS[ivName];
   const targetMidi = from.midi + dir*semis;
   if(targetMidi < RANGE_LOW || targetMidi > RANGE_HIGH) return null;
-  return spellMidi(targetMidi);
+  // letra destino: avanzar 'steps' letras en la dirección
+  const fromIdx = LETTERS.indexOf(from.letter);
+  const li = ((fromIdx + dir*steps) % 7 + 7) % 7;
+  const letter = LETTERS[li];
+  const natural = LETTER_PC[letter];
+  // octava + alteración que cuadren con targetMidi para esa letra
+  for(let oct=2; oct<=6; oct++){
+    const acc = targetMidi - ((oct+1)*12 + natural);
+    if(acc>=-1 && acc<=1){   // solo natural, sostenido o bemol simples (sin dobles)
+      const m = (oct+1)*12 + natural + acc;
+      if(m===targetMidi){
+        return {letter, acc, octave:oct, midi:m, pc:((natural+acc)%12+12)%12};
+      }
+    }
+  }
+  return null; // exigiría doble alteración: se descarta este intervalo/dirección
 }
 
 // elige la grafía más simple para un MIDI dado (mínima alteración).
@@ -450,7 +496,7 @@ function genExercisePro(allowedArr, numNotes){
   for(let attempt=0; attempt<60; attempt++){
     const L = baseLetters[Math.floor(Math.random()*7)];
     const oct = 3 + Math.floor(Math.random()*2); // 3 o 4
-    const acc = [0,0,0,1,-1][Math.floor(Math.random()*5)];
+    const acc = 0; // 1ª nota natural: minimiza la necesidad de dobles alteraciones
     const m = (oct+1)*12 + LETTER_PC[L] + acc;
     if(m>=RANGE_LOW+2 && m<=RANGE_HIGH-2){
       const first = {letter:L, acc, octave:oct, midi:m, pc:((LETTER_PC[L]+acc)%12+12)%12};
@@ -531,7 +577,7 @@ function renderExercise(idx){
   // ancho interno fijo y amplio (el CSS lo escala al 100% de la tarjeta).
   // con 10 notas necesita bastante recorrido horizontal.
   const width = 920;
-  const height = 124;
+  const height = 138;
   const renderer = new VF.Renderer(box, VF.Renderer.Backends.SVG);
   renderer.resize(width, height);
   const ctx = renderer.getContext();
@@ -563,20 +609,20 @@ function renderExercise(idx){
   // viewBox para que width:100%/height:auto escale proporcionalmente
   svg.setAttribute("viewBox", "0 0 "+width+" "+height);
   svg.removeAttribute("width"); svg.removeAttribute("height");
+  // Posiciones de cada cabeza:
+  //  - Y: la da VexFlow con getYs() (posición real en el pentagrama, sin depender
+  //       de glifos de alteración que descuadran el bounding box).
+  //  - X: centro del bounding box de la cabeza.
   const positions = [];
   const headGroups = svg.querySelectorAll("g.vf-notehead");
-  if(headGroups.length === notes.length){
-    headGroups.forEach(g=>{
-      const r = g.getBBox();
-      positions.push({x:r.x + r.width/2, y:r.y + r.height/2});
-    });
-  } else {
-    // fallback: usar la API de VexFlow si el DOM no trae las clases esperadas
-    notes.forEach(sn=>{
-      const ys = sn.getYs();
-      positions.push({x:sn.getAbsoluteX()+6, y:ys[0]});
-    });
-  }
+  notes.forEach((sn, k)=>{
+    let x;
+    if(headGroups[k]){ const r=headGroups[k].getBBox(); x = r.x + r.width/2; }
+    else { x = sn.getAbsoluteX()+6; }
+    const ys = sn.getYs();
+    const y = ys[0];
+    positions.push({x, y});
+  });
   noteStaveX[idx] = positions;
 
   drawIntervalLines(idx);
@@ -592,12 +638,22 @@ function drawIntervalLines(idx){
   const NS = "http://www.w3.org/2000/svg";
   // borrar líneas previas
   [...svg.querySelectorAll(".ivline")].forEach(l=>l.remove());
-  const MARGIN = 18; // hueco entre la cabeza y el inicio/fin de la línea
+  const MARGIN = 18;      // hueco entre la cabeza y el inicio/fin de la línea
+  const MIN_TILT = 5;     // inclinación mínima en px (ninguna línea totalmente horizontal)
+  const notes = ex.notes;
   for(let i=1;i<pos.length;i++){
     const iv = ex.intervals[i-1];
     const color = INTERVAL_COLOR[iv.name] || "#999";
-    const a = pos[i-1], b = pos[i];
-    // vector unitario de a->b para recortar el margen en ambas puntas
+    const a = {x:pos[i-1].x, y:pos[i-1].y};
+    const b = {x:pos[i].x,   y:pos[i].y};
+    // si los Y quedan casi iguales pero las notas no son del mismo grave/agudo,
+    // forzar inclinación según la dirección real del intervalo (b respecto a a)
+    if(Math.abs(b.y - a.y) < MIN_TILT){
+      const dir = notes[i].midi > notes[i-1].midi ? -1 : 1; // más agudo => Y menor (sube)
+      const half = MIN_TILT/2;
+      a.y += dir*half;     // bajar/subir un poco el origen
+      b.y -= dir*half;     // y al revés el destino
+    }
     const dx = b.x-a.x, dy = b.y-a.y;
     const len = Math.hypot(dx,dy) || 1;
     const ux = dx/len, uy = dy/len;
@@ -625,6 +681,131 @@ function setHeadColor(idx, noteIdx, color){
       p.setAttribute("fill", color); p.setAttribute("stroke", color);
     });
   }
+}
+
+// escribe un aviso de dirección encima/debajo de la nota.
+// dir: "baja" -> debajo; "alta" -> encima.
+// mode: "estas" (1er fallo, naranja) | "quedaste" (2º fallo, rojo)
+function setPitchHint(idx, noteIdx, dir, mode){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  clearPitchHint(idx);
+  const pos = noteStaveX[idx];
+  if(!pos || !pos[noteIdx]) return;
+  const NS = "http://www.w3.org/2000/svg";
+  const t = document.createElementNS(NS,"text");
+  const p = pos[noteIdx];
+  const yOff = dir==="baja" ? 28 : -22;   // debajo si va bajo, encima si va alto
+  t.setAttribute("x", p.x);
+  t.setAttribute("y", p.y + yOff);
+  t.setAttribute("text-anchor","middle");
+  t.setAttribute("font-size","12");
+  t.setAttribute("font-weight","800");
+  t.setAttribute("class","pitchhint");
+  if(mode==="quedaste"){
+    t.setAttribute("fill", "#dc2626"); // rojo
+    t.textContent = dir==="baja" ? "quedaste bajo" : "quedaste alto";
+  } else {
+    t.setAttribute("fill", "#ea7317"); // naranja
+    t.textContent = dir==="baja" ? "estás bajo" : "estás alto";
+  }
+  svg.appendChild(t);
+}
+function clearPitchHint(idx){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  [...svg.querySelectorAll(".pitchhint")].forEach(e=>e.remove());
+}
+
+// onda expansiva verde sutil sobre la cabeza acertada
+function pulseCorrect(idx, noteIdx){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  const pos = noteStaveX[idx]; if(!pos || !pos[noteIdx]) return;
+  const NS="http://www.w3.org/2000/svg";
+  const c=document.createElementNS(NS,"circle");
+  c.setAttribute("cx",pos[noteIdx].x); c.setAttribute("cy",pos[noteIdx].y);
+  c.setAttribute("r","6"); c.setAttribute("fill","none");
+  c.setAttribute("stroke","#16a34a"); c.setAttribute("stroke-width","2.5");
+  c.setAttribute("class","fxring"); svg.appendChild(c);
+  const a1=document.createElementNS(NS,"animate");
+  a1.setAttribute("attributeName","r"); a1.setAttribute("from","6"); a1.setAttribute("to","22");
+  a1.setAttribute("dur","0.5s"); a1.setAttribute("fill","freeze");
+  const a2=document.createElementNS(NS,"animate");
+  a2.setAttribute("attributeName","opacity"); a2.setAttribute("from","0.8"); a2.setAttribute("to","0");
+  a2.setAttribute("dur","0.5s"); a2.setAttribute("fill","freeze");
+  c.appendChild(a1); c.appendChild(a2);
+  if(a1.beginElement) a1.beginElement();
+  if(a2.beginElement) a2.beginElement();
+  setTimeout(()=>c.remove(),550);
+}
+
+// temblor de la cabeza fallada (rojo)
+function shakeNote(idx, noteIdx){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  const heads = svg.querySelectorAll("g.vf-notehead");
+  const g = heads[noteIdx]; if(!g) return;
+  g.style.transformBox="fill-box"; g.style.transformOrigin="center";
+  g.style.animation="noteShake .42s ease-in-out";
+  setTimeout(()=>{ g.style.animation=""; }, 460);
+}
+
+// flecha + "sonaba así" (verde) apuntando lateralmente a la nota correcta
+function showSoundedLike(idx, noteIdx){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  const pos = noteStaveX[idx]; if(!pos || !pos[noteIdx]) return;
+  const NS="http://www.w3.org/2000/svg";
+  const p=pos[noteIdx];
+  const g=document.createElementNS(NS,"g"); g.setAttribute("class","soundedlike");
+  const x=p.x, y=p.y;
+  const GREEN="#16a34a";
+  // flecha horizontal que entra desde la izquierda a la altura de la nota
+  const line=document.createElementNS(NS,"line");
+  line.setAttribute("x1",x-70); line.setAttribute("y1",y); line.setAttribute("x2",x-12); line.setAttribute("y2",y);
+  line.setAttribute("stroke",GREEN); line.setAttribute("stroke-width","2");
+  const head=document.createElementNS(NS,"path");
+  head.setAttribute("d",`M ${x-12} ${y} l -7 -4 l 0 8 z`);
+  head.setAttribute("fill",GREEN);
+  const t=document.createElementNS(NS,"text");
+  t.setAttribute("x",x-72); t.setAttribute("y",y-5); t.setAttribute("text-anchor","end");
+  t.setAttribute("font-size","12"); t.setAttribute("font-weight","800"); t.setAttribute("fill",GREEN);
+  t.textContent="sonaba así";
+  g.appendChild(line); g.appendChild(head); g.appendChild(t);
+  svg.appendChild(g);
+}
+function clearSoundedLike(idx){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  [...svg.querySelectorAll(".soundedlike")].forEach(e=>e.remove());
+}
+
+// guarda el color de relleno actual de cada cabeza (para restaurar tras un gris temporal)
+function snapshotHeadColors(idx){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return [];
+  const heads = svg.querySelectorAll("g.vf-notehead");
+  return [...heads].map(g=>{ const p=g.querySelector("path"); return p?p.getAttribute("fill"):"#000"; });
+}
+function restoreHeadColors(idx, saved){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  const heads = svg.querySelectorAll("g.vf-notehead");
+  heads.forEach((g,k)=>{
+    const color = saved[k] || "#000";
+    g.querySelectorAll("path").forEach(p=>{ p.setAttribute("fill",color); p.setAttribute("stroke",color); });
+  });
+  // restaurar también el color de las líneas (el gris las atenuó)
+  drawIntervalLines(idx);
 }
 
 // poner TODAS las cabezas y líneas en gris (mientras suena la referencia)
@@ -726,12 +907,13 @@ window.addEventListener("resize", ()=>{ for(let i=0;i<NUM_EX;i++) if(CURRENT[i])
    ========================================================= */
 const CFG = {
   pianoDuration: 1800,
+  refDuration: 1100,
   noteTimeout: 6000,
-  postPianoMute: 550,
-  startGrayPause: 150,
-  rmsMin: 0.008, micGain: 6.0,
-  centsPerfect: 50, centsNear: 80,
-  framesNeeded: 5, lowSignalFrames: 25,
+  postPianoMute: 350,
+  startGrayPause: 60,
+  rmsMin: 0.024, micGain: 8.0,
+  centsPerfect: 60, centsNear: 90,
+  framesNeeded: 4, lowSignalFrames: 25, silenceFrames: 40,
   frameInterval: 80, fftSize: 2048
 };
 
@@ -779,9 +961,9 @@ function blip(freqs,type,dur,vol){
   g.gain.exponentialRampToValueAtTime(0.0001,t+dur); g.connect(audioCtx.destination);
   freqs.forEach((f,i)=>{const o=audioCtx.createOscillator();o.type=type;o.frequency.setValueAtTime(f,t+i*dur*0.35);o.connect(g);o.start(t+i*dur*0.35);o.stop(t+dur+0.05);});
 }
-function soundCorrect(){ blip([880,1320],"sine",0.18,0.25); }
-function soundWarn(){ blip([520],"sine",0.16,0.18); }
-function soundFail(){ blip([330,220],"sawtooth",0.28,0.20); }
+function soundCorrect(){ blip([784,1175,1568],"sine",0.22,0.28); }  // arpegio claro ascendente
+function soundWarn(){ blip([440],"sine",0.10,0.07); }                // muy sutil, breve
+function soundFail(){ blip([160,110],"sawtooth",0.42,0.26); }       // grave, descendente, claro
 
 function autoCorrelate(buf, sr){
   const SIZE=buf.length; let rms=0;
@@ -821,31 +1003,63 @@ function getFrame(){ analyser.getFloatTimeDomainData(pitchBuffer); return autoCo
 const debugEl=()=>document.getElementById("debug");
 const warnEl=()=>document.getElementById("signalWarn");
 
+// aviso de nivel de volumen junto a la barra (idx). El "apenas te escucho" + consejo
+// solo aparece si el silencio bajo se sostiene (silenceOk=true).
+function setSignal(idx, rms, silenceOk){
+  const msg = document.getElementById("vumsg"+idx);
+  const warn = warnEl();
+  if(msg){ msg.classList.remove("ok","low","none"); }
+  warn.classList.remove("ok","low","none");
+  if(rms >= CFG.rmsMin){
+    if(msg){ msg.classList.add("show","ok"); msg.textContent = "Nivel de volumen correcto"; }
+    warn.textContent = "";
+  } else if(rms > CFG.rmsMin*0.4){
+    if(msg){ msg.classList.add("show","low"); msg.textContent = "Canta más fuerte"; }
+    warn.textContent = "";
+  } else {
+    // silencio: solo avisar si lleva ya un rato (evita parpadeo constante)
+    if(silenceOk){
+      if(msg){ msg.classList.add("show","none"); msg.textContent = "Apenas te escucho"; }
+      warn.classList.add("none");
+      warn.textContent = "Acércate al micrófono y sube el volumen de entrada en Ajustes › Sonido › Entrada";
+    } else {
+      if(msg){ msg.classList.remove("show"); msg.textContent = ""; }
+      warn.textContent = "";
+    }
+  }
+}
+
 // escucha un intento; devuelve {verdict:"hit"|"miss"|"timeout", dir}
-async function listenForNote(targetMidi, statusEl, muteMs){
+async function listenForNote(targetMidi, statusEl, muteMs, idx, noteIdx){
   const startT=performance.now(); muteMs=muteMs||0;
-  let good=0,bad=0,lastBad=null,low=0,nearDir="";
-  warnEl().textContent="";
+  let good=0,bad=0,lastBad=null,nearDir="",silence=0,noTone=0;
+  const silenceNeeded = Math.round(2000/CFG.frameInterval); // ~2s antes de avisar
   while(performance.now()-startT<CFG.noteTimeout){
     if(performance.now()-startT<muteMs){ getFrame(); await sleep(CFG.frameInterval); continue; }
     const {freq,rms}=getFrame();
+    if(rms <= CFG.rmsMin*0.4) silence++; else silence=0;
+    setSignal(idx, rms, silence>=silenceNeeded);
     if(freq>0 && rms>=CFG.rmsMin){
-      low=0;
+      noTone=0;
       const {centsAbs,dir}=evaluatePitch(freq,targetMidi);
       const {midi:sung}=freqToMidiCents(freq);
       debugEl().textContent=`${freq.toFixed(0)}Hz · ${centsAbs.toFixed(0)}c · ok${good} mal${bad}`;
       if(centsAbs<=CFG.centsPerfect){
         good++; bad=0;
+        clearPitchHint(idx);
         if(good>=CFG.framesNeeded) return {verdict:"hit"};
       } else {
         if(lastBad!==null && Math.abs(sung-lastBad)<=1) bad++; else bad=1;
         lastBad=sung; good=Math.max(0,good-1); nearDir=dir;
-        if(bad>=3){ statusEl.textContent = (centsAbs<=CFG.centsNear?"Casi: ":"")+(dir==="baja"?"↓ baja":"↑ alta"); }
         if(bad>=CFG.framesNeeded) return {verdict:"miss",dir:nearDir};
       }
+    } else if(rms>=CFG.rmsMin){
+      // hay volumen pero no se detecta una nota clara (voz con aire, ruido…)
+      noTone++;
+      if(noTone>=12){ const w=warnEl(); w.className="signal-warn low"; w.textContent="Mantén la nota con voz clara"; }
+      debugEl().textContent=`sin tono claro · rms ${rms.toFixed(3)}`;
     } else {
-      good=Math.max(0,good-1); bad=Math.max(0,bad-1); if(bad===0)lastBad=null;
-      if(rms>CFG.rmsMin*0.4 && rms<CFG.rmsMin){ low++; if(low>=CFG.lowSignalFrames) warnEl().textContent="Te oigo muy bajo: acércate al micro o sube el volumen de entrada (Ajustes › Sonido › Entrada)."; }
+      good=Math.max(0,good-1); bad=Math.max(0,bad-1); if(bad===0)lastBad=null; noTone=0;
       debugEl().textContent=`silencio · rms ${rms.toFixed(3)}`;
     }
     await sleep(CFG.frameInterval);
@@ -861,44 +1075,80 @@ async function runExercise(e){
   const statusEl=document.getElementById("status"+e);
   let correct=0;
   exEl.classList.add("active");
-  // re-render para limpiar colores de una pasada anterior
   renderExercise(e);
 
-  // mientras suena la referencia: todo en gris (= "espera, aún no")
   setExerciseGray(e);
   statusEl.textContent="Escucha la 1ª nota…";
-  await playTone(midiToFreq(ex.notes[0].midi), CFG.pianoDuration);
+  await playTone(midiToFreq(ex.notes[0].midi), CFG.refDuration);
   await sleep(CFG.startGrayPause);
-  // la referencia ha terminado: restaurar colores y empezar a evaluar
   restoreExercise(e);
 
   for(let i=0;i<ex.notes.length;i++){
     const tgt=ex.notes[i].midi;
     setHeadColor(e,i,"#2355ce");
-    statusEl.textContent=`Canta la nota ${i+1} de 5`;
-    let res=await listenForNote(tgt, statusEl, CFG.postPianoMute);
+    clearPitchHint(e); clearSoundedLike(e);
+    statusEl.textContent=`Canta la nota ${i+1} de ${ex.notes.length}`;
+    let res=await listenForNote(tgt, statusEl, CFG.postPianoMute, e, i);
     if(res.verdict==="hit"){
-      setHeadColor(e,i,"#16a34a"); soundCorrect(); correct++; statusEl.textContent=""; continue;
+      setHeadColor(e,i,"#16a34a"); soundCorrect(); pulseCorrect(e,i);
+      correct++; statusEl.textContent=""; continue;
     }
+    // 1er fallo: amarillo + sonido sutil + aviso "estás bajo/alto" (todo a la vez)
     setHeadColor(e,i,"#f5a623"); soundWarn();
+    setPitchHint(e, i, res.dir || "baja", "estas");
     statusEl.textContent="Otra vez";
-    await sleep(350);
+    await sleep(450);
+    clearPitchHint(e);
     setHeadColor(e,i,"#2355ce");
-    res=await listenForNote(tgt, statusEl, CFG.postPianoMute);
+    res=await listenForNote(tgt, statusEl, CFG.postPianoMute, e, i);
     if(res.verdict==="hit"){
-      setHeadColor(e,i,"#16a34a"); soundCorrect(); correct++; statusEl.textContent="";
+      setHeadColor(e,i,"#16a34a"); clearPitchHint(e); soundCorrect(); pulseCorrect(e,i);
+      correct++; statusEl.textContent="";
     } else {
-      setHeadColor(e,i,"#dc2626"); soundFail();
-      await sleep(300);
-      statusEl.textContent="Así sonaba:";
-      await playTone(midiToFreq(tgt), CFG.pianoDuration);
-      await sleep(150);
+      // 2º fallo: rojo + temblor + sonido grave + "quedaste alto/bajo"
+      const failDir = res.dir || "baja";
+      setHeadColor(e,i,"#dc2626"); shakeNote(e,i); soundFail();
+      setPitchHint(e, i, failDir, "quedaste");
       statusEl.textContent="";
+      await sleep(700);
+      // ahora la respuesta correcta: resto en gris (como al inicio), nota correcta en verde
+      clearPitchHint(e);
+      const saved = snapshotHeadColors(e);   // guardar estado visual actual
+      setExerciseGray(e);
+      setHeadColor(e,i,"#16a34a");   // la nota correcta destaca en verde sobre el gris
+      showSoundedLike(e,i);
+      await playTone(midiToFreq(tgt), CFG.refDuration);  // misma duración que la referencia inicial
+      await sleep(CFG.startGrayPause);
+      clearSoundedLike(e);
+      restoreHeadColors(e, saved);   // recuperar el estado de las demás notas
+      setHeadColor(e,i,"#dc2626");   // la fallada queda en rojo
     }
   }
+  const vm=document.getElementById("vumsg"+e); if(vm){ vm.classList.remove("show","ok","low","none"); vm.textContent=""; }
+  clearPitchHint(e); clearSoundedLike(e);
+  warnEl().textContent=""; warnEl().className="signal-warn";
   exEl.classList.remove("active");
   statusEl.textContent=`Hecho · ${correct}/${ex.notes.length}`;
   document.getElementById("debug").textContent="";
+  await showResult(correct, ex.notes.length);
+}
+
+// overlay de resultado a pantalla completa (verde/amarillo/rojo según aciertos)
+function showResult(correct, total){
+  return new Promise(res=>{
+    const ov=document.getElementById("resultOverlay");
+    const sc=document.getElementById("resultScore");
+    const msg=document.getElementById("resultMsg");
+    ov.classList.remove("good","mid","bad");
+    let cls, txt;
+    if(correct>=8){ cls="good"; txt="¡Muy bien!"; }
+    else if(correct>=5){ cls="mid"; txt="Vas bien, sigue"; }
+    else { cls="bad"; txt="A seguir practicando"; }
+    sc.textContent = correct+"/"+total;
+    msg.textContent = txt;
+    ov.classList.add(cls,"on");
+    setTimeout(()=>{ ov.classList.remove("on"); res(); }, 1800);
+  });
 }
 
 // ---------- arranque: un play por ejercicio ----------

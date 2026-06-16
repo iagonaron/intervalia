@@ -1031,10 +1031,16 @@ function setSignal(idx, rms, silenceOk){
 }
 
 // escucha un intento; devuelve {verdict:"hit"|"miss"|"timeout", dir}
-async function listenForNote(targetMidi, statusEl, muteMs, idx, noteIdx){
+// prevMidi: nota anterior ya acertada; su "coletazo" se ignora hasta que el alumno se mueve.
+async function listenForNote(targetMidi, statusEl, muteMs, idx, noteIdx, prevMidi){
   const startT=performance.now(); muteMs=muteMs||0;
   let good=0,bad=0,lastBad=null,nearDir="",silence=0,noTone=0;
+  let moved=false; // ¿el alumno ya dejó de sostener la nota anterior?
   const silenceNeeded = Math.round(2000/CFG.frameInterval); // ~2s antes de avisar
+  // solo tiene sentido ignorar la anterior si es de distinta altura que la actual
+  const prevPc = (prevMidi!=null) ? ((prevMidi%12)+12)%12 : null;
+  const targetPc = ((targetMidi%12)+12)%12;
+  const canIgnorePrev = prevPc!=null && prevPc!==targetPc;
   while(performance.now()-startT<CFG.noteTimeout){
     if(performance.now()-startT<muteMs){ getFrame(); await sleep(CFG.frameInterval); continue; }
     const {freq,rms}=getFrame();
@@ -1042,6 +1048,18 @@ async function listenForNote(targetMidi, statusEl, muteMs, idx, noteIdx){
     setSignal(idx, rms, silence>=silenceNeeded);
     if(freq>0 && rms>=CFG.rmsMin){
       noTone=0;
+      // ¿lo que suena todavía es la nota ANTERIOR? -> es el coletazo, lo ignoramos
+      if(!moved && canIgnorePrev){
+        const prevEval = evaluatePitch(freq, prevMidi);
+        const curEval  = evaluatePitch(freq, targetMidi);
+        // si está claramente más cerca de la anterior que de la actual, esperar
+        if(prevEval.centsAbs < curEval.centsAbs && prevEval.centsAbs <= CFG.centsNear){
+          debugEl().textContent=`(sostiene anterior) ${freq.toFixed(0)}Hz`;
+          await sleep(CFG.frameInterval);
+          continue;
+        }
+        moved = true; // ya canta algo distinto de la anterior: empezamos a evaluar
+      }
       const {centsAbs,dir}=evaluatePitch(freq,targetMidi);
       const {midi:sung}=freqToMidiCents(freq);
       debugEl().textContent=`${freq.toFixed(0)}Hz · ${centsAbs.toFixed(0)}c · ok${good} mal${bad}`;
@@ -1061,6 +1079,7 @@ async function listenForNote(targetMidi, statusEl, muteMs, idx, noteIdx){
       debugEl().textContent=`sin tono claro · rms ${rms.toFixed(3)}`;
     } else {
       good=Math.max(0,good-1); bad=Math.max(0,bad-1); if(bad===0)lastBad=null; noTone=0;
+      moved=true; // un silencio entre notas también cuenta como que soltó la anterior
       debugEl().textContent=`silencio · rms ${rms.toFixed(3)}`;
     }
     await sleep(CFG.frameInterval);
@@ -1089,7 +1108,8 @@ async function runExercise(e){
     setHeadColor(e,i,"#2355ce");
     clearPitchHint(e); clearSoundedLike(e);
     statusEl.textContent=`Canta la nota ${i+1} de ${ex.notes.length}`;
-    let res=await listenForNote(tgt, statusEl, CFG.postPianoMute, e, i);
+    const prevMidi = i>0 ? ex.notes[i-1].midi : null;  // ignorar coletazo de la anterior
+    let res=await listenForNote(tgt, statusEl, CFG.postPianoMute, e, i, prevMidi);
     if(res.verdict==="hit"){
       setHeadColor(e,i,"#16a34a"); soundCorrect(); pulseCorrect(e,i);
       correct++; statusEl.textContent=""; continue;

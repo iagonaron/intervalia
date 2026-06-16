@@ -55,9 +55,10 @@
   .result-inner{text-align:center;line-height:1}
   .result-score{font-size:min(34vw,300px);font-weight:900;letter-spacing:-.04em;
     font-variant-numeric:tabular-nums;text-shadow:0 6px 50px rgba(0,0,0,.45)}
-  .result-msg{font-size:min(6vw,38px);font-weight:800;margin-top:10px;letter-spacing:.02em}
+  .result-msg{font-size:min(6vw,34px);font-weight:800;margin-top:10px;letter-spacing:.02em;max-width:18ch;margin-left:auto;margin-right:auto;line-height:1.2}
   #resultOverlay.good .result-score,#resultOverlay.good .result-msg{color:#22c98a}
   #resultOverlay.mid  .result-score,#resultOverlay.mid  .result-msg{color:#f5a623}
+  #resultOverlay.low  .result-score,#resultOverlay.low  .result-msg{color:#ff8a3d}
   #resultOverlay.bad  .result-score,#resultOverlay.bad  .result-msg{color:#ff5c72}
 
   /* topinfo */
@@ -1139,15 +1140,18 @@ function showResult(correct, total){
     const ov=document.getElementById("resultOverlay");
     const sc=document.getElementById("resultScore");
     const msg=document.getElementById("resultMsg");
-    ov.classList.remove("good","mid","bad");
+    ov.classList.remove("good","mid","low","bad");
     let cls, txt;
-    if(correct>=8){ cls="good"; txt="¡Muy bien!"; }
-    else if(correct>=5){ cls="mid"; txt="Vas bien, sigue"; }
-    else { cls="bad"; txt="A seguir practicando"; }
+    if(correct>=9){ cls="good"; txt="¡Muy bien!"; }
+    else if(correct>=7){ cls="good"; txt="¡Bien!"; }
+    else if(correct>=5){ cls="mid"; txt="¡Vas bien!"; }
+    else if(correct>=3){ cls="low"; txt="¡Sigue intentándolo!"; }
+    else { cls="bad"; txt="Selecciona intervalos más sencillos para progresar"; }
     sc.textContent = correct+"/"+total;
     msg.textContent = txt;
     ov.classList.add(cls,"on");
-    setTimeout(()=>{ ov.classList.remove("on"); res(); }, 1800);
+    const dur = correct<3 ? 2600 : 1800; // el mensaje largo se queda algo más
+    setTimeout(()=>{ ov.classList.remove("on"); res(); }, dur);
   });
 }
 

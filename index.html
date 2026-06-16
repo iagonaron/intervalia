@@ -60,6 +60,21 @@
   #resultOverlay.mid  .result-score,#resultOverlay.mid  .result-msg{color:#f5a623}
   #resultOverlay.low  .result-score,#resultOverlay.low  .result-msg{color:#ff8a3d}
   #resultOverlay.bad  .result-score,#resultOverlay.bad  .result-msg{color:#ff5c72}
+  /* modal de bienvenida (selección de intervalos al abrir) */
+  #welcomeModal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+    background:rgba(4,7,18,.78);padding:20px}
+  #welcomeModal.hidden{display:none}
+  .wm-card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+    border-radius:20px;padding:28px 30px;max-width:840px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+  .wm-title{margin:0 0 6px;font-size:22px;font-weight:900;color:var(--ink)}
+  .wm-sub{margin:0 0 18px;font-size:13.5px;color:var(--muted);line-height:1.5}
+  .wm-card .ivals{flex-wrap:nowrap;justify-content:center;gap:6px;margin-bottom:22px}
+  .wm-card .ival{width:46px;height:46px;flex:0 0 46px;font-size:13px}
+  .wm-btns{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+  .wm-accept{border:none;border-radius:12px;padding:13px 30px;font-size:15px;font-weight:800;cursor:pointer;
+    letter-spacing:.06em;color:#04210f;background:linear-gradient(135deg,#2fe39a,#16a34a);transition:transform .05s,filter .15s}
+  .wm-accept:hover{filter:brightness(1.08)}
+  .wm-accept:active{transform:scale(.97)}
 
   /* topinfo */
   .topinfo{display:flex;justify-content:flex-end;align-items:baseline;gap:7px;margin:0 0 6px;line-height:1}
@@ -185,6 +200,18 @@
 </head>
 <body>
 <div id="resultOverlay"><div class="result-inner"><div class="result-score" id="resultScore"></div><div class="result-msg" id="resultMsg"></div></div></div>
+<div id="welcomeModal">
+  <div class="wm-card">
+    <h3 class="wm-title">Antes de empezar</h3>
+    <p class="wm-sub">Elige los intervalos que pueden aparecer en los ejercicios. La 2ª menor y la 2ª mayor van siempre incluidas.</p>
+    <div class="ivals" id="ivalsModal"></div>
+    <div class="wm-btns">
+      <button id="wmDice" class="ip-btn" title="Selección aleatoria"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><circle cx="16" cy="8" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/><circle cx="16" cy="16" r="1.6" fill="currentColor"/></svg> Al azar</button>
+      <button id="wmAll" class="ip-btn ip-text">Todos</button>
+      <button id="wmAccept" class="wm-accept">ACEPTAR</button>
+    </div>
+  </div>
+</div>
 <div class="topinfo">
   <span class="topinfo-by">by Iago González Alonso</span>
   <span class="topinfo-sep">·</span>
@@ -832,20 +859,23 @@ const SWATCH_COLOR = Object.assign({}, INTERVAL_COLOR, {"8J":"#9aa0b5"});
 
 // ---------- PANEL DE INTERVALOS ----------
 function renderIntervalPanel(){
-  const el = document.getElementById("ivals");
-  el.innerHTML = "";
-  INTERVAL_ORDER.forEach(name=>{
-    const b = document.createElement("button");
-    b.className = "ival" + (SELECTED.has(name)?" on":"") + (isLocked(name)?" locked":"");
-    b.style.setProperty("--ic", SWATCH_COLOR[name]);
-    b.textContent = INTERVAL_LABEL[name];   // etiqueta corta: 2m, 2M, TT, etc.
-    b.title = INTERVAL_FULL[name];          // nombre completo en el tooltip
-    b.onclick = ()=>{
-      if(isLocked(name)) return;          // 2m y 2M no se desmarcan
-      if(SELECTED.has(name)) SELECTED.delete(name); else SELECTED.add(name);
-      renderIntervalPanel();
-    };
-    el.appendChild(b);
+  ["ivals","ivalsModal"].forEach(containerId=>{
+    const el = document.getElementById(containerId);
+    if(!el) return;
+    el.innerHTML = "";
+    INTERVAL_ORDER.forEach(name=>{
+      const b = document.createElement("button");
+      b.className = "ival" + (SELECTED.has(name)?" on":"") + (isLocked(name)?" locked":"");
+      b.style.setProperty("--ic", SWATCH_COLOR[name]);
+      b.textContent = INTERVAL_LABEL[name];
+      b.title = INTERVAL_FULL[name];
+      b.onclick = ()=>{
+        if(isLocked(name)) return;
+        if(SELECTED.has(name)) SELECTED.delete(name); else SELECTED.add(name);
+        renderIntervalPanel();
+      };
+      el.appendChild(b);
+    });
   });
 }
 
@@ -919,6 +949,7 @@ const CFG = {
 };
 
 let audioCtx=null, analyser=null, micStream=null, pitchBuffer=null;
+let micGainNode=null, rawAnalyser=null, rawBuffer=null, autoGain=null;
 
 async function initAudio(){
   if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -926,10 +957,40 @@ async function initAudio(){
   if(!micStream){
     micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
     const src = audioCtx.createMediaStreamSource(micStream);
-    const micGain = audioCtx.createGain(); micGain.gain.value = CFG.micGain;
+    autoGain = CFG.micGain;                 // ganancia inicial; se autoajusta con el uso
+    micGainNode = audioCtx.createGain(); micGainNode.gain.value = autoGain;
     analyser = audioCtx.createAnalyser(); analyser.fftSize = CFG.fftSize;
-    src.connect(micGain); micGain.connect(analyser);
+    src.connect(micGainNode); micGainNode.connect(analyser);
     pitchBuffer = new Float32Array(analyser.fftSize);
+    // analizador de la señal CRUDA (antes de ganancia), para calibrar la entrada real
+    rawAnalyser = audioCtx.createAnalyser(); rawAnalyser.fftSize = CFG.fftSize;
+    src.connect(rawAnalyser);
+    rawBuffer = new Float32Array(rawAnalyser.fftSize);
+  }
+}
+
+// RMS de la señal cruda (sin ganancia aplicada)
+function rawRms(){
+  if(!rawAnalyser) return 0;
+  rawAnalyser.getFloatTimeDomainData(rawBuffer);
+  let s=0; for(let i=0;i<rawBuffer.length;i++){ const v=rawBuffer[i]; s+=v*v; }
+  return Math.sqrt(s/rawBuffer.length);
+}
+
+// autoajuste de ganancia: lleva el RMS amplificado de la VOZ cantada al rango objetivo.
+// Solo se llama cuando hay tono claro (canto real), nunca con ruido/silencio.
+function calibrateGain(){
+  const raw = rawRms();
+  if(raw < 0.0008) return;            // demasiado bajo para ser voz: no calibrar
+  const amplified = raw * autoGain;
+  const TARGET = 0.05;                // nivel amplificado deseado para voz cantada
+  const ratio = TARGET / amplified;
+  // ajuste suave (no saltar de golpe) y dentro de límites razonables
+  let next = autoGain * (1 + (ratio-1)*0.15);
+  next = Math.max(2, Math.min(40, next));
+  if(Math.abs(next-autoGain) > 0.05){
+    autoGain = next;
+    if(micGainNode) micGainNode.gain.setTargetAtTime(autoGain, audioCtx.currentTime, 0.05);
   }
 }
 
@@ -1044,6 +1105,7 @@ async function listenForNote(targetMidi, statusEl, muteMs, idx, noteIdx, prevMid
   while(performance.now()-startT<CFG.noteTimeout){
     if(performance.now()-startT<muteMs){ getFrame(); await sleep(CFG.frameInterval); continue; }
     const {freq,rms}=getFrame();
+    calibrateGain();   // autoajuste de ganancia basado en la señal cruda (se autolimita a voz)
     if(rms <= CFG.rmsMin*0.4) silence++; else silence=0;
     setSignal(idx, rms, silence>=silenceNeeded);
     if(freq>0 && rms>=CFG.rmsMin){
@@ -1216,9 +1278,16 @@ document.getElementById("diceBtn").addEventListener("click", ()=>{ if(running) r
 // todos (abajo): SOLO selecciona todos los intervalos, no genera
 document.getElementById("allBtn").addEventListener("click", ()=>{ if(running) return; selectAll(); });
 
-// init
+// modal de bienvenida: botones de selección + aceptar
+document.getElementById("wmDice").addEventListener("click", ()=>{ diceIntervals(); });
+document.getElementById("wmAll").addEventListener("click", ()=>{ selectAll(); });
+document.getElementById("wmAccept").addEventListener("click", ()=>{
+  document.getElementById("welcomeModal").classList.add("hidden");
+  generateAll();   // genera los ejercicios con la selección elegida
+});
+
+// init: pintar paneles y mostrar el modal (NO generar hasta que el usuario acepte)
 renderIntervalPanel();
-generateAll();
 </script>
 </body>
 </html>

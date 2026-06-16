@@ -26,9 +26,20 @@
     font-family:"Helvetica Neue",Arial,system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
     padding:8px 26px 16px; display:flex; flex-direction:column; min-height:100%;
-    background:linear-gradient(180deg, #0b1f4d 0%, #0a1430 32%, #060a18 70%, #02030a 100%);
-    background-attachment:fixed;
+    position:relative;
   }
+  /* capa de fondo AZUL (base, siempre visible) */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:linear-gradient(180deg, #0b1f4d 0%, #0a1430 32%, #060a18 70%, #02030a 100%);
+  }
+  /* capa de fondo DORADO (encima de la azul, aparece por opacidad en modo Pro) */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:linear-gradient(180deg, #4d3a0b 0%, #2e2308 32%, #160f04 70%, #0a0702 100%);
+    opacity:0; transition:opacity .7s ease;
+  }
+  body.pro::after{ opacity:1; }
   .home2,.ath{font-style:italic;font-family:Georgia,'Times New Roman',serif;font-weight:500;color:#aeb6d6;transform:rotate(-3deg);display:inline-block}
 
   /* topinfo */
@@ -81,7 +92,7 @@
   .ex-head{display:flex;align-items:center;gap:11px;margin-bottom:4px}
   .ex-title{font-size:13px;font-weight:700;color:var(--ink);letter-spacing:.02em}
   .ex-key{font-size:12px;color:var(--muted2);margin-left:auto}
-  .scoreBox{background:var(--paper);border-radius:10px;padding:6px 8px;overflow:hidden;position:relative;width:100%}
+  .scoreBox{background:var(--paper);border-radius:10px;padding:2px 8px 10px;overflow:hidden;position:relative;width:100%}
   .scoreBox svg{display:block;width:100%;height:auto}
   .ex-status{font-size:12px;color:var(--muted);min-height:1em}
   .ex-play{border:1px solid rgba(233,237,255,.45);background:rgba(233,237,255,.16);color:#e9edff;border-radius:50%;
@@ -105,7 +116,7 @@
   .gen-btn:active{transform:scale(.97)}
   .gen-btn svg{width:22px;height:22px}
   /* botón PRO — dorado, conmutador */
-  .pro-btn{border:1px solid rgba(212,175,55,.55);border-radius:12px;padding:12px 20px;font-size:14px;font-weight:900;
+  .pro-btn{border:1px solid rgba(212,175,55,.55);border-radius:12px;padding:10px 20px;font-size:14px;font-weight:900;
     letter-spacing:.08em;cursor:pointer;transition:all .15s;
     color:var(--gold1);background:linear-gradient(135deg, rgba(212,175,55,0.16), rgba(184,134,11,0.08));
     box-shadow:inset 0 0 0 1px rgba(212,175,55,0.3)}
@@ -169,7 +180,7 @@
 
 <div class="topgen">
   <button id="genBtn" class="gen-btn"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><circle cx="16" cy="8" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/><circle cx="16" cy="16" r="1.6" fill="currentColor"/></svg> Generar ejercicios</button>
-  <button id="proBtn" class="pro-btn" title="Nivel Pro: entrenamiento interválico puro, sin tonalidad">PRO</button>
+  <button id="proBtn" class="pro-btn" title="Nivel Pro: entrenamiento interválico puro, sin tonalidad">Nivel Pro</button>
 </div>
 <div class="pro-note" id="proNote"></div>
 
@@ -520,13 +531,13 @@ function renderExercise(idx){
   // ancho interno fijo y amplio (el CSS lo escala al 100% de la tarjeta).
   // con 10 notas necesita bastante recorrido horizontal.
   const width = 920;
-  const height = 112;
+  const height = 124;
   const renderer = new VF.Renderer(box, VF.Renderer.Backends.SVG);
   renderer.resize(width, height);
   const ctx = renderer.getContext();
   ctx.setFont("Arial", 10);
 
-  const stave = new VF.Stave(10, 10, width-20);
+  const stave = new VF.Stave(10, 6, width-20);
   stave.addClef("treble");
   stave.setContext(ctx).draw();
 
@@ -910,10 +921,16 @@ document.getElementById("genBtn").addEventListener("click", ()=>{ if(running) re
 // botón PRO: conmuta modo interválico puro (sin tonalidad)
 document.getElementById("proBtn").addEventListener("click", ()=>{
   if(running) return;
+  // al ACTIVAR, pedir confirmación (al desactivar no hace falta)
+  if(!PRO_MODE){
+    const ok = confirm("NIVEL PRO\n\nDesarrollado para alumnos de Grado Profesional.\n\nLos ejercicios dejan de tener contexto tonal: serán notas aleatorias para entrenamiento interválico puro, con o sin alteraciones.\n\n¿Activar el Nivel Pro?");
+    if(!ok) return;
+  }
   PRO_MODE = !PRO_MODE;
   const btn = document.getElementById("proBtn");
   const note = document.getElementById("proNote");
   btn.classList.toggle("active", PRO_MODE);
+  document.body.classList.toggle("pro", PRO_MODE);  // fundido del fondo dorado
   note.textContent = PRO_MODE
     ? "Nivel Pro · desarrollado para alumnos de Grado Profesional. Entrenamiento interválico puro: notas aleatorias sin contexto tonal."
     : "";

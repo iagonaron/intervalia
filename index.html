@@ -87,6 +87,8 @@
   header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:nowrap}
   .brand{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap}
   .brand h1{font-size:30px;font-weight:800;margin:0;letter-spacing:-0.6px;line-height:1.1}
+  .brand-link{text-decoration:none;color:inherit;cursor:pointer;transition:opacity .15s}
+  .brand-link:hover{opacity:.82}
   .brand .lm{color:var(--ink);font-weight:900}
   .brand .eav{color:var(--muted2);font-weight:300}
   .brand .home2{font-size:.62em}
@@ -221,7 +223,7 @@
 <div class="header-bar">
   <header>
     <div class="brand">
-      <h1><span class="lm">LM</span><span class="eav">EAV</span> <span class="home2">at home</span></h1>
+      <h1><a href="https://iagonaron.github.io/LMEAVathome/" class="brand-link"><span class="lm">LM</span><span class="eav">EAV</span> <span class="home2">at home</span></a></h1>
       <div class="brand-sub">Recursos interactivos LM y EAV desde tu casa</div>
     </div>
   </header>
@@ -718,7 +720,7 @@ function setPitchHint(idx, noteIdx, dir, mode){
   const box = document.getElementById("score"+idx);
   const svg = box.querySelector("svg");
   if(!svg) return;
-  clearPitchHint(idx);
+  clearPitchHintFor(idx, noteIdx);   // sustituir solo el hint de ESTA nota
   const pos = noteStaveX[idx];
   if(!pos || !pos[noteIdx]) return;
   const NS = "http://www.w3.org/2000/svg";
@@ -731,6 +733,7 @@ function setPitchHint(idx, noteIdx, dir, mode){
   t.setAttribute("font-size","12");
   t.setAttribute("font-weight","800");
   t.setAttribute("class","pitchhint");
+  t.setAttribute("data-note", noteIdx);
   if(mode==="quedaste"){
     t.setAttribute("fill", "#dc2626"); // rojo
     t.textContent = dir==="baja" ? "quedaste bajo" : "quedaste alto";
@@ -740,6 +743,14 @@ function setPitchHint(idx, noteIdx, dir, mode){
   }
   svg.appendChild(t);
 }
+// borra el hint de UNA nota concreta
+function clearPitchHintFor(idx, noteIdx){
+  const box = document.getElementById("score"+idx);
+  const svg = box.querySelector("svg");
+  if(!svg) return;
+  [...svg.querySelectorAll('.pitchhint[data-note="'+noteIdx+'"]')].forEach(e=>e.remove());
+}
+// borra TODOS los hints del ejercicio (solo al empezar una pasada nueva)
 function clearPitchHint(idx){
   const box = document.getElementById("score"+idx);
   const svg = box.querySelector("svg");
@@ -1168,7 +1179,7 @@ async function runExercise(e){
   for(let i=0;i<ex.notes.length;i++){
     const tgt=ex.notes[i].midi;
     setHeadColor(e,i,"#2355ce");
-    clearPitchHint(e); clearSoundedLike(e);
+    clearSoundedLike(e);
     statusEl.textContent=`Canta la nota ${i+1} de ${ex.notes.length}`;
     const prevMidi = i>0 ? ex.notes[i-1].midi : null;  // ignorar coletazo de la anterior
     let res=await listenForNote(tgt, statusEl, CFG.postPianoMute, e, i, prevMidi);
@@ -1176,39 +1187,40 @@ async function runExercise(e){
       setHeadColor(e,i,"#16a34a"); soundCorrect(); pulseCorrect(e,i);
       correct++; statusEl.textContent=""; continue;
     }
-    // 1er fallo: amarillo + sonido sutil + aviso "estás bajo/alto" (todo a la vez)
+    // 1er fallo: amarillo + sonido sutil + aviso "estás bajo/alto"
+    // (permanece visible hasta que el 2º intento defina el resultado)
     setHeadColor(e,i,"#f5a623"); soundWarn();
     setPitchHint(e, i, res.dir || "baja", "estas");
     statusEl.textContent="Otra vez";
     await sleep(450);
-    clearPitchHint(e);
     setHeadColor(e,i,"#2355ce");
     res=await listenForNote(tgt, statusEl, CFG.postPianoMute, e, i);
     if(res.verdict==="hit"){
-      setHeadColor(e,i,"#16a34a"); clearPitchHint(e); soundCorrect(); pulseCorrect(e,i);
+      clearPitchHintFor(e,i);   // acertó al 2º: quitar el aviso de esta nota
+      setHeadColor(e,i,"#16a34a"); soundCorrect(); pulseCorrect(e,i);
       correct++; statusEl.textContent="";
     } else {
       // 2º fallo: rojo + temblor + sonido grave + "quedaste alto/bajo"
+      // (este aviso PERMANECE el resto del ejercicio, como diagnóstico)
       const failDir = res.dir || "baja";
       setHeadColor(e,i,"#dc2626"); shakeNote(e,i); soundFail();
       setPitchHint(e, i, failDir, "quedaste");
       statusEl.textContent="";
       await sleep(700);
-      // ahora la respuesta correcta: resto en gris (como al inicio), nota correcta en verde
-      clearPitchHint(e);
-      const saved = snapshotHeadColors(e);   // guardar estado visual actual
+      // respuesta correcta: resto en gris, nota correcta en verde, "sonaba así"
+      const saved = snapshotHeadColors(e);
       setExerciseGray(e);
-      setHeadColor(e,i,"#16a34a");   // la nota correcta destaca en verde sobre el gris
+      setHeadColor(e,i,"#16a34a");
       showSoundedLike(e,i);
-      await playTone(midiToFreq(tgt), CFG.refDuration);  // misma duración que la referencia inicial
+      await playTone(midiToFreq(tgt), CFG.refDuration);
       await sleep(CFG.startGrayPause);
       clearSoundedLike(e);
-      restoreHeadColors(e, saved);   // recuperar el estado de las demás notas
-      setHeadColor(e,i,"#dc2626");   // la fallada queda en rojo
+      restoreHeadColors(e, saved);
+      setHeadColor(e,i,"#dc2626");
     }
   }
   const vm=document.getElementById("vumsg"+e); if(vm){ vm.classList.remove("show","ok","low","none"); vm.textContent=""; }
-  clearPitchHint(e); clearSoundedLike(e);
+  clearSoundedLike(e);   // los avisos "quedaste" permanecen como diagnóstico
   warnEl().textContent=""; warnEl().className="signal-warn";
   exEl.classList.remove("active");
   statusEl.textContent=`Hecho · ${correct}/${ex.notes.length}`;

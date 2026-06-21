@@ -28,18 +28,11 @@
     padding:8px 26px 16px; display:flex; flex-direction:column; min-height:100%;
     position:relative;
   }
-  /* capa de fondo AZUL (base, siempre visible) */
+  /* capa de fondo AZUL (base) */
   body::before{
     content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
     background:linear-gradient(180deg, #0b1f4d 0%, #0a1430 32%, #060a18 70%, #02030a 100%);
   }
-  /* capa de fondo DORADO (encima de la azul, aparece por opacidad en modo Pro) */
-  body::after{
-    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background:linear-gradient(180deg, #4d3a0b 0%, #2e2308 32%, #160f04 70%, #0a0702 100%);
-    opacity:0; transition:opacity .7s ease;
-  }
-  body.pro::after{ opacity:1; }
   .home2,.ath{font-style:italic;font-family:Georgia,'Times New Roman',serif;font-weight:500;color:#aeb6d6;transform:rotate(-3deg);display:inline-block}
   @keyframes noteShake{
     0%,100%{transform:translateX(0)}
@@ -156,14 +149,6 @@
   .gen-btn:hover{background:rgba(233,237,255,.26)}
   .gen-btn:active{transform:scale(.97)}
   .gen-btn svg{width:22px;height:22px}
-  /* botón PRO — dorado, conmutador */
-  .pro-btn{border:1px solid rgba(212,175,55,.55);border-radius:12px;padding:10px 20px;font-size:14px;font-weight:900;
-    letter-spacing:.08em;cursor:pointer;transition:all .15s;
-    color:var(--gold1);background:linear-gradient(135deg, rgba(212,175,55,0.16), rgba(184,134,11,0.08));
-    box-shadow:inset 0 0 0 1px rgba(212,175,55,0.3)}
-  .pro-btn:hover{color:#f0d57a;background:linear-gradient(135deg, rgba(212,175,55,0.28), rgba(184,134,11,0.16))}
-  .pro-btn.active{color:#1a1407;background:linear-gradient(135deg,var(--gold1),var(--gold2));box-shadow:0 4px 16px rgba(212,175,55,.35)}
-  .pro-note{text-align:center;font-size:12.5px;color:var(--gold1);margin:8px 0 0;min-height:1.2em;font-weight:600}
 
   /* panel de intervalos seleccionables — cuadrados */
   .ipanel-label{max-width:960px;margin:10px auto 5px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);text-align:left}
@@ -238,9 +223,7 @@
 
 <div class="topgen">
   <button id="genBtn" class="gen-btn"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/><circle cx="16" cy="8" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/><circle cx="16" cy="16" r="1.6" fill="currentColor"/></svg> Generar ejercicios</button>
-  <button id="proBtn" class="pro-btn" title="Nivel Pro: entrenamiento interválico puro, sin tonalidad">Nivel Pro</button>
 </div>
-<div class="pro-note" id="proNote"></div>
 
 <div class="grid" id="grid">
   <div class="ex" id="ex0"><div class="ex-head"><button class="ex-play" data-ex="0" title="Cantar este ejercicio"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><span class="ex-title">Ejercicio 1</span><span class="ex-status" id="status0"></span><span class="vumsg" id="vumsg0"></span><span class="ex-key" id="key0"></span></div><div class="scoreBox" id="score0"></div></div>
@@ -576,9 +559,8 @@ const INTERVAL_FULL = {
   "6M":"6ª mayor","7m":"7ª menor","7M":"7ª mayor","8J":"8ª justa"
 };
 const INTERVAL_ORDER = ["2m","2M","3m","3M","4J","TT","5J","6m","6M","7m","7M","8J"];
-const LOCKED_TONAL = new Set(["2m","2M"]); // en modo tonal, siempre activos
-let PRO_MODE = false;
-function isLocked(name){ return !PRO_MODE && LOCKED_TONAL.has(name); }
+const LOCKED_TONAL = new Set(["2m","2M"]); // siempre activos (tonalidad garantizada)
+function isLocked(name){ return LOCKED_TONAL.has(name); }
 // estado de selección (Set de nombres activos)
 let SELECTED = new Set(["2m","2M","3m","3M","4J","TT","5J","6m","6M","7m","7M","8J"]);
 // intervalos con color oscuro -> texto blanco ya va bien; el negro (8J) necesita marca
@@ -891,19 +873,11 @@ function renderIntervalPanel(){
 }
 
 function diceIntervals(){
-  if(PRO_MODE){
-    // Pro: 5 intervalos cualesquiera al azar (sin obligatorios)
-    SELECTED = new Set();
-    const all = INTERVAL_ORDER.slice();
-    for(let i=all.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [all[i],all[j]]=[all[j],all[i]]; }
-    all.slice(0,5).forEach(n=>SELECTED.add(n));
-  } else {
-    // tonal: 2m y 2M obligatorios + 3 aleatorios del resto
-    SELECTED = new Set(["2m","2M"]);
-    const rest = INTERVAL_ORDER.filter(n=>!isLocked(n));
-    for(let i=rest.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [rest[i],rest[j]]=[rest[j],rest[i]]; }
-    rest.slice(0,3).forEach(n=>SELECTED.add(n));
-  }
+  // 2m y 2M obligatorios + 3 aleatorios del resto
+  SELECTED = new Set(["2m","2M"]);
+  const rest = INTERVAL_ORDER.filter(n=>!isLocked(n));
+  for(let i=rest.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [rest[i],rest[j]]=[rest[j],rest[i]]; }
+  rest.slice(0,3).forEach(n=>SELECTED.add(n));
   renderIntervalPanel();
 }
 function selectAll(){
@@ -911,31 +885,20 @@ function selectAll(){
   renderIntervalPanel();
 }
 
-// ---------- GENERAR los 2 ejercicios ----------
+// ---------- GENERAR los 2 ejercicios (modo tonal) ----------
 function generateAll(){
-  if(PRO_MODE){
-    // entrenamiento interválico puro: notas aleatorias, sin tonalidad
-    const allowedArr = [...SELECTED];
-    for(let i=0;i<NUM_EX;i++){
-      let ex=null, tries=0;
-      do{ ex = genExercisePro(allowedArr, NUM_NOTES); tries++; }while(!ex && tries<60);
-      CURRENT[i] = ex || genExercisePro(["2m","2M","3m","3M"], NUM_NOTES);
-    }
-  } else {
-    // modo tonal: tonalidad implícita, 1ª tónica, última del acorde
-    const allowed = new Set(SELECTED);
-    allowed.add("2m"); allowed.add("2M"); // garantía de tonalidad
-    const usedKeys = [];
-    for(let i=0;i<NUM_EX;i++){
-      let key, ex, tries=0;
-      do{
-        key = KEYS[Math.floor(Math.random()*KEYS.length)];
-        ex = genExercise(key, {numNotes:NUM_NOTES, allowed});
-        tries++;
-      }while((!ex || usedKeys.includes(key.name)) && tries<40);
-      usedKeys.push(key.name);
-      CURRENT[i] = ex;
-    }
+  const allowed = new Set(SELECTED);
+  allowed.add("2m"); allowed.add("2M"); // garantía de tonalidad
+  const usedKeys = [];
+  for(let i=0;i<NUM_EX;i++){
+    let key, ex, tries=0;
+    do{
+      key = KEYS[Math.floor(Math.random()*KEYS.length)];
+      ex = genExercise(key, {numNotes:NUM_NOTES, allowed});
+      tries++;
+    }while((!ex || usedKeys.includes(key.name)) && tries<40);
+    usedKeys.push(key.name);
+    CURRENT[i] = ex;
   }
   for(let i=0;i<NUM_EX;i++){ renderExercise(i); document.getElementById("status"+i).textContent=""; document.getElementById("ex"+i).classList.remove("active"); }
   document.getElementById("result").textContent="";
@@ -1266,25 +1229,6 @@ document.querySelectorAll(".ex-play").forEach(btn=>{
 });
 // botón GENERAR (arriba): único que crea ejercicios nuevos
 document.getElementById("genBtn").addEventListener("click", ()=>{ if(running) return; generateAll(); });
-// botón PRO: conmuta modo interválico puro (sin tonalidad)
-document.getElementById("proBtn").addEventListener("click", ()=>{
-  if(running) return;
-  // al ACTIVAR, pedir confirmación (al desactivar no hace falta)
-  if(!PRO_MODE){
-    const ok = confirm("NIVEL PRO\n\nDesarrollado para alumnos de Grado Profesional.\n\nLos ejercicios dejan de tener contexto tonal: serán notas aleatorias para entrenamiento interválico puro, con o sin alteraciones.\n\n¿Activar el Nivel Pro?");
-    if(!ok) return;
-  }
-  PRO_MODE = !PRO_MODE;
-  const btn = document.getElementById("proBtn");
-  const note = document.getElementById("proNote");
-  btn.classList.toggle("active", PRO_MODE);
-  document.body.classList.toggle("pro", PRO_MODE);  // fundido del fondo dorado
-  note.textContent = PRO_MODE
-    ? "Nivel Pro · desarrollado para alumnos de Grado Profesional. Entrenamiento interválico puro: notas aleatorias sin contexto tonal."
-    : "";
-  renderIntervalPanel();   // en Pro la 2m/2M dejan de estar bloqueadas
-  generateAll();           // regenera con el modo nuevo
-});
 // dado (abajo): SOLO cambia la selección de intervalos al azar, no genera
 document.getElementById("diceBtn").addEventListener("click", ()=>{ if(running) return; diceIntervals(); });
 // todos (abajo): SOLO selecciona todos los intervalos, no genera
